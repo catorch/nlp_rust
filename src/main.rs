@@ -1,6 +1,7 @@
 use polars::export::rayon::prelude::*;
 use polars::prelude;
 use polars::prelude::*;
+use text_processing::create_vocabulary;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use stopwords::{Language, Spark, Stopwords};
@@ -57,6 +58,7 @@ fn main() {
         .cloned()
         .collect();
 
+    // Load df
     let df = CsvReader::from_path(file_path)
         .expect("Failed to read CSV file")
         .infer_schema(None)
@@ -70,7 +72,7 @@ fn main() {
     let core_solution_series_str = core_solution_series.str().expect("not str");
 
     // Clean each entry in the series and collect the results into a vector
-    let core_solution_cleaned: Vec<String> = core_solution_series_str
+    let cleaned_docs: Vec<String> = core_solution_series_str
         .par_iter()
         .map(|opt_val| {
             opt_val
@@ -79,7 +81,10 @@ fn main() {
         })
         .collect();
 
-    println!("{:?}", core_solution_cleaned);
+    // Create a vocabulary of all unique words
+    let vocab_list = create_vocabulary(cleaned_docs);
+
+    println!("{:?}", vocab_list);
 }
 
 // // Get first row
