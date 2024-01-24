@@ -1,10 +1,12 @@
 use polars::export::rayon::prelude::*;
 use polars::prelude;
 use polars::prelude::*;
-use text_processing::create_vocabulary;
+use rand::distributions::{Distribution, Uniform};
+use rand::thread_rng;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use stopwords::{Language, Spark, Stopwords};
+use text_processing::create_vocabulary;
 
 use crate::text_processing::{clean_text, doc2bow};
 mod text_processing;
@@ -85,16 +87,86 @@ fn main() {
     let vocab_list = create_vocabulary(&cleaned_docs);
 
     // Create a HashMap for word to index mapping
-    let word_index: HashMap<_, _> = vocab_list.iter().enumerate().map(|(idx, word)| (word.clone(), idx)).collect();
+    let word_index: HashMap<_, _> = vocab_list
+        .iter()
+        .enumerate()
+        .map(|(idx, word)| (word.clone(), idx))
+        .collect();
 
     // Initialize a Document-Term  DataFrame with zeros
     let mut dtm: DataFrame = DataFrame::new(
-        vocab_list.iter().map(|word| {
-            UInt32Chunked::from_slice(word, &vec![0; cleaned_docs.len()]).into_series()
-        }).collect()
-    ).expect("msg");
+        vocab_list
+            .iter()
+            .map(|word| UInt32Chunked::from_slice(word, &vec![0; cleaned_docs.len()]).into_series())
+            .collect(),
+    )
+    .expect("msg");
 
-    println!("{:?}", word_index);
+    let num_documents = cleaned_docs.len();
+    let num_words = vocab_list.len();
+    let num_topics = 5; // The number of topics
+
+    // Initialize parameters
+
+    // 1. Document-Topic Distribution: This is a matrix where each row represents a document and each
+    //  column represents a topic. The value in each cell is the probability of the topic in the corresponding
+    //  document.
+    let mut doc_topic_dist = vec![vec![0f64; num_topics]; num_documents];
+    let mut rng = thread_rng();
+    let topic_dist = Uniform::from(0..num_topics);
+    for doc_dist in doc_topic_dist.iter_mut() {
+        let mut topic_counts = vec![0; num_topics];
+        for topic_count in topic_counts.iter_mut() {
+            *topic_count = topic_dist.sample(&mut rng);
+        }
+        let total: usize = topic_counts.iter().sum();
+        for (i, count) in topic_counts.iter().enumerate() {
+            doc_dist[i] = *count as f64 / total as f64;
+        }
+    }
+
+    // 2. Topic-Word Distribution: This is a matrix where each row represents a topic and each column a word.
+    //  The value in each cell is the probability of the word in the corresponding topic.
+    let mut topic_word_dist = vec![vec![0f64; num_words]; num_topics];
+    let word_dist = Uniform::from(0..num_words);
+    for topic_dist in topic_word_dist.iter_mut() {
+        let mut word_counts = vec![0; num_words];
+        for word_count in word_counts.iter_mut() {
+            *word_count = word_dist.sample(&mut rng);
+        }
+        let total: usize = word_counts.iter().sum();
+        for (i, count) in word_counts.iter().enumerate() {
+            topic_dist[i] = *count as f64 / total as f64;
+        }
+    }
+
+    // 3. Word-Topic Assignment: This is an auxilliary structure to track which topic is assigned to
+    //  each word in document.
+
+    // let mut word_topic_assignment: HashMap<(usize, usize), usize> = HashMap::new();
+    // for (doc_idx, doc) in dtm.iter().enumerate() {
+    //     for (word_idx, _) in doc.iter().enumerate() {
+    //         let topic = topic_dist.sample(&mut rng);
+    //         word_topic_assignment.insert((doc_idx, word_idx), topic);
+    //     }
+    // }
+    let estimated_capacity = num_documents * num_words;
+    let mut word_topic_assignment = HashMap::with_capacity(estimated_capacity);
+    
+    let mut word_topic_assignment: HashMap<(usize, usize), usize> =
+        HashMap::with_capacity(estimated_capacity);
+
+    dtm.u32().expect().par_iter().enumerate().for_each(|(doc_idx, doc)| {
+        let local_rng = &mut rand::thread_rng();
+        let local_topic_dist = Uniform::from(0..num_topics);
+
+        doc.iter().enumerate().for_each(|(word_idx, _)| {
+            let topic = local_topic_dist.sample(local_rng);
+            word_topic_assignment.insert((doc_idx, word_idx), topic);
+        });
+    });
+
+    println!("{:?}", word_topic_assignment);
 }
 
 // // Get first row

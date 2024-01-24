@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 polars = "0.36.2"
+rand = "0.8.5"
 rayon = "1.8.1"
 regex = "1.10.3"
 stopwords = "0.1.1"
