@@ -33,9 +33,9 @@ pub fn clean_text(text: &str, stops: &HashSet<&str>) -> String {
         .join(" ")
 }
 
-pub fn create_vocabulary(docs: Vec<String>) -> Vec<String> {
+pub fn create_vocabulary(docs: &Vec<String>) -> Vec<String> {
     let mut vocabulary = HashSet::new();
-    for doc in &docs {
+    for doc in docs {
         for word in doc.split_whitespace() {
             vocabulary.insert(word.to_string());
         }

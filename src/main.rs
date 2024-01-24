@@ -82,9 +82,19 @@ fn main() {
         .collect();
 
     // Create a vocabulary of all unique words
-    let vocab_list = create_vocabulary(cleaned_docs);
+    let vocab_list = create_vocabulary(&cleaned_docs);
 
-    println!("{:?}", vocab_list);
+    // Create a HashMap for word to index mapping
+    let word_index: HashMap<_, _> = vocab_list.iter().enumerate().map(|(idx, word)| (word.clone(), idx)).collect();
+
+    // Initialize a Document-Term  DataFrame with zeros
+    let mut dtm: DataFrame = DataFrame::new(
+        vocab_list.iter().map(|word| {
+            UInt32Chunked::from_slice(word, &vec![0; cleaned_docs.len()]).into_series()
+        }).collect()
+    ).expect("msg");
+
+    println!("{:?}", word_index);
 }
 
 // // Get first row
