@@ -105,6 +105,7 @@ fn main() {
     let num_documents = cleaned_docs.len();
     let num_words = vocab_list.len();
     let num_topics = 5; // The number of topics
+    let num_iterations = 3;
 
     // Initialize parameters
 
@@ -156,6 +157,21 @@ fn main() {
         for word_idx in 0..num_words {
             let topic = topic_dist.sample(&mut rng);
             word_topic_assignment[doc_idx][word_idx] = topic;
+        }
+    }
+
+    // LDirichlet prior parameters
+    let alpha = 0.1; 
+    let beta = 0.01;
+
+    // LDA Algorithm
+    let mut rng = thread_rng();
+
+    for _ in 0..num_iterations {
+        for doc_idx in 0..num_documents {
+            for word_idx in 0..num_words {
+                let current_topic = word_topic_assignment[doc_idx][word_idx];
+            }
         }
     }
     
