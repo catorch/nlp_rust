@@ -8,7 +8,9 @@ use std::error::Error;
 use stopwords::{Language, Spark, Stopwords};
 use text_processing::create_vocabulary;
 
+use crate::lda::sample_discrete;
 use crate::text_processing::{clean_text, doc2bow};
+mod lda;
 mod text_processing;
 
 fn bow() {
@@ -161,7 +163,7 @@ fn main() {
     }
 
     // LDirichlet prior parameters
-    let alpha = 0.1; 
+    let alpha = 0.1;
     let beta = 0.01;
 
     // LDA Algorithm
@@ -171,12 +173,63 @@ fn main() {
         for doc_idx in 0..num_documents {
             for word_idx in 0..num_words {
                 let current_topic = word_topic_assignment[doc_idx][word_idx];
+
+                // Decrement counts for this word's current topic
+                doc_topic_dist[doc_idx][current_topic] -= 1.0;
+                topic_word_dist[current_topic][word_idx] -= 1.0;
+
+                // Calculate the probabilities for each topic
+                let mut probabilities = Vec::with_capacity(num_topics);
+
+                for k in 0..num_topics {
+                    let prob_topic_doc = (doc_topic_dist[doc_idx][k] + alpha)
+                        / (doc_topic_dist[doc_idx].iter().sum::<f64>() + alpha * num_topics as f64);
+                    let prob_word_topic = (topic_word_dist[k][word_idx] + beta)
+                        / (topic_word_dist[k].iter().sum::<f64>() + beta * num_words as f64);
+                    probabilities.push(prob_topic_doc * prob_word_topic);
+                }
+
+                // Normalize probabilities
+                let sum_probabilities: f64 = probabilities.iter().sum();
+                let normalized_probabilities: Vec<f64> = probabilities
+                    .iter()
+                    .map(|p| p / sum_probabilities)
+                    .collect();
+
+                // Sample a new topic based on the probabilities
+                let new_topic = sample_discrete(&normalized_probabilities, &mut rng);
+                word_topic_assignment[doc_idx][word_idx] = new_topic;
+
+                // Increment counts for new topic
+                doc_topic_dist[doc_idx][new_topic] += 1.0;
+                topic_word_dist[new_topic][word_idx] += 1.0;
             }
         }
     }
-    
 
-    println!("{:?}", word_topic_assignment);
+    // Extract top 20 words for each topic
+    for topic_idx in 0..num_topics {
+        // Collect word probabilities along with their indices for the current topic
+        let mut word_probabilities: Vec<(usize, f64)> = topic_word_dist[topic_idx]
+            .iter()
+            .enumerate()
+            .map(|(word_idx, &prob)| (word_idx, prob))
+            .collect();
+
+        // Sort by probability in descending order
+        word_probabilities.sort_by(|a,b| b.1.partial_cmp(&a.1).unwrap());
+
+        // Select top 20 words
+        let top_words: Vec<String> = word_probabilities
+            .iter()
+            .take(20)
+            .map(|&(word_idx, _)| vocab_list[word_idx].clone())
+            .collect();
+
+        print!("Topic {}: {:?}", topic_idx + 1, top_words);
+    }
+
+    
 }
 
 // // Get first row
