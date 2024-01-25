@@ -150,21 +150,15 @@ fn main() {
     //         word_topic_assignment.insert((doc_idx, word_idx), topic);
     //     }
     // }
-    let estimated_capacity = num_documents * num_words;
-    let mut word_topic_assignment = HashMap::with_capacity(estimated_capacity);
+
+    let mut word_topic_assignment = vec![vec![0; num_words]; num_documents];
+    for doc_idx in 0..num_documents {
+        for word_idx in 0..num_words {
+            let topic = topic_dist.sample(&mut rng);
+            word_topic_assignment[doc_idx][word_idx] = topic;
+        }
+    }
     
-    let mut word_topic_assignment: HashMap<(usize, usize), usize> =
-        HashMap::with_capacity(estimated_capacity);
-
-    dtm.u32().expect().par_iter().enumerate().for_each(|(doc_idx, doc)| {
-        let local_rng = &mut rand::thread_rng();
-        let local_topic_dist = Uniform::from(0..num_topics);
-
-        doc.iter().enumerate().for_each(|(word_idx, _)| {
-            let topic = local_topic_dist.sample(local_rng);
-            word_topic_assignment.insert((doc_idx, word_idx), topic);
-        });
-    });
 
     println!("{:?}", word_topic_assignment);
 }
