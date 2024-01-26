@@ -88,11 +88,27 @@ fn main() {
         })
         .collect();
 
+    // Generate a word count map
+    let mut word_count_map: HashMap<String, usize> = HashMap::new();
+    for doc in &cleaned_docs {
+        let bow = doc2bow(doc);
+        for (word, count) in bow {
+            *word_count_map.entry(word).or_insert(0) += count;
+        }
+    }
+
+    // Filter words that have at least 10 counts
+    let filtered_vocab: Vec<String> = word_count_map
+        .into_iter()
+        .filter(|&(_, count)| count >= 20)
+        .map(|(word, _)| word)
+        .collect();
+
     // Create a vocabulary of all unique words
     let vocab_list = create_vocabulary(&cleaned_docs);
 
     // Create a HashMap for word to index mapping
-    let word_index: HashMap<_, _> = vocab_list
+    let word_index: HashMap<_, _> = filtered_vocab
         .iter()
         .enumerate()
         .map(|(idx, word)| (word.clone(), idx))
@@ -100,7 +116,7 @@ fn main() {
 
     // Initialize a Document-Term  DataFrame with zeros
     let mut dtm: DataFrame = DataFrame::new(
-        vocab_list
+        filtered_vocab
             .iter()
             .map(|word| UInt32Chunked::from_slice(word, &vec![0; cleaned_docs.len()]).into_series())
             .collect(),
@@ -108,10 +124,13 @@ fn main() {
     .expect("msg");
 
     let num_documents = cleaned_docs.len();
-    let num_words = vocab_list.len();
-    let num_topics = 5; // The number of topics
+    let num_words = filtered_vocab.len();
+    let num_topics = 3; // The number of topics
     let num_iterations = 3;
     let mut rng = thread_rng();
+
+    println!("{:?}", num_words);
+
     // Initialize parameters
 
     // 1. Document-Topic Distribution: This is a matrix where each row represents a document and each
@@ -148,7 +167,7 @@ fn main() {
         Array2::random_using((num_documents, num_words), topic_dist, &mut rng);
 
     // LDirichlet prior parameters
-    let alpha = 0.1;
+    let alpha = 15.0;
     let beta = 0.01;
 
     let alpha_array = Array2::from_elem((num_documents, num_topics), alpha);
@@ -229,7 +248,7 @@ fn main() {
         let top_words: Vec<String> = word_probabilities
             .iter()
             .take(20)
-            .map(|&(word_idx, _)| vocab_list[word_idx].clone())
+            .map(|&(word_idx, _)| filtered_vocab[word_idx].clone())
             .collect();
 
         println!("Topic {}: {:?}", topic_idx + 1, top_words);

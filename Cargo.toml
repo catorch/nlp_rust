@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 ndarray = "0.15.6"
 ndarray-rand = "0.14.0"
+num_cpus = "1.16.0"
 polars = "0.36.2"
 rand = "0.8.5"
 rayon = "1.8.1"
